@@ -120,14 +120,43 @@ const brew: IPCBrew = {
   async indexSpecific(formulaNames: string[]): Promise<void> {
     if (!formulaNames.length) return;
 
-    const { formulae } = JSON.parse(
-      await runBackgroundBrewProcess([
-        "info",
-        "--json=v2",
-        "--formula",
-        ...formulaNames,
-      ])
-    );
+    const infoForNames = async (names: string[]) => {
+      const { formulae } = JSON.parse(
+        await runBackgroundBrewProcess([
+          "info",
+          "--json=v2",
+          "--formula",
+          ...names,
+        ])
+      );
+      return formulae;
+    };
+
+    let formulae: BrewPackageInfo[] = [];
+    try {
+      formulae = await infoForNames(formulaNames);
+    } catch (error) {
+      // A single formula that fails to load takes down the whole bulk query
+      // (e.g. a tap formula whose class name doesn't match its file name),
+      // so fall back to querying one at a time and skip whatever is broken.
+      console.error(`Bulk formula query failed, retrying individually:`, error);
+      let recovered = false;
+      for (const formulaName of formulaNames) {
+        try {
+          formulae.push(...(await infoForNames([formulaName])));
+          recovered = true;
+        } catch (individualError) {
+          console.error(
+            `Skipping formula that failed to load: ${formulaName}`,
+            individualError
+          );
+        }
+      }
+      // If every name failed too, this is not one broken formula but a broken
+      // brew — rethrow rather than ingest an empty list, which would drop the
+      // previously indexed entries via deleteIfUnavailable.
+      if (!recovered) throw error;
+    }
 
     const [analytics, updateTimes] = await Promise.all([
       (brew as any)._fetchOfficialAnalytics(),
