@@ -247,14 +247,42 @@ const brewCask: IPCBrewCask = {
   async indexSpecific(caskNames: string[]): Promise<void> {
     if (!caskNames.length) return;
 
-    const { casks } = JSON.parse(
-      await runBackgroundBrewProcess([
-        "info",
-        "--json=v2",
-        "--cask",
-        ...caskNames,
-      ])
-    );
+    const infoForNames = async (names: string[]) => {
+      const { casks } = JSON.parse(
+        await runBackgroundBrewProcess([
+          "info",
+          "--json=v2",
+          "--cask",
+          ...names,
+        ])
+      );
+      return casks;
+    };
+
+    let casks: BrewCaskPackageInfo[] = [];
+    try {
+      casks = await infoForNames(caskNames);
+    } catch (error) {
+      // A single cask that fails to load takes down the whole bulk query,
+      // so fall back to querying one at a time and skip whatever is broken.
+      console.error(`Bulk cask query failed, retrying individually:`, error);
+      let recovered = false;
+      for (const caskName of caskNames) {
+        try {
+          casks.push(...(await infoForNames([caskName])));
+          recovered = true;
+        } catch (individualError) {
+          console.error(
+            `Skipping cask that failed to load: ${caskName}`,
+            individualError
+          );
+        }
+      }
+      // If every name failed too, this is not one broken cask but a broken
+      // brew — rethrow rather than ingest an empty list, which would drop the
+      // previously indexed entries via deleteIfUnavailable.
+      if (!recovered) throw error;
+    }
 
     await (brewCask as any)._ingestCaskInfo(
       casks,
@@ -886,11 +914,10 @@ export async function getBrewExecutablePath(): Promise<string> {
 }
 
 export async function getQuarantineFlags(): Promise<string[]> {
-  return [
-    `--${
-      (await settings.get("validateCodeSignatures")) ? "" : "no-"
-    }quarantine`,
-  ];
+  // Homebrew removed the --[no-]quarantine switch entirely (hidden and
+  // deprecated for the 4.7 cycle, removed with 5.0). Quarantining is now
+  // applied unconditionally, so pass no flags.
+  return [];
 }
 
 export async function getVerboseFlags(): Promise<string[]> {
