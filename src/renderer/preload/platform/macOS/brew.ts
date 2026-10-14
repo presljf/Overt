@@ -26,6 +26,7 @@ import {
   fetchUpdateTimes,
   getBrewExecutablePath,
   getVerboseFlags,
+  noAskEnvPrefix,
   runBackgroundBrewProcess,
   TapInfo,
 } from "./brewCask";
@@ -473,13 +474,14 @@ const brew: IPCBrew = {
       });
 
       terminal.send(
-        quote([
-          await getBrewExecutablePath(),
-          "install",
-          ...(await getVerboseFlags()),
-          "--formula",
-          formulaName,
-        ]) +
+        noAskEnvPrefix +
+          quote([
+            await getBrewExecutablePath(),
+            "install",
+            ...(await getVerboseFlags()),
+            "--formula",
+            formulaName,
+          ]) +
           " && echo '-- overt-succeeded: formula-install --' || echo '-- overt-failed: formula-install --'\n"
       );
     });
@@ -509,13 +511,14 @@ const brew: IPCBrew = {
       });
 
       terminal.send(
-        quote([
-          await getBrewExecutablePath(),
-          "upgrade",
-          ...(await getVerboseFlags()),
-          "--formula",
-          formulaName,
-        ]) +
+        noAskEnvPrefix +
+          quote([
+            await getBrewExecutablePath(),
+            "upgrade",
+            ...(await getVerboseFlags()),
+            "--formula",
+            formulaName,
+          ]) +
           " && echo '-- overt-succeeded: formula-upgrade --' || echo '-- overt-failed: formula-upgrade --'\n"
       );
     });

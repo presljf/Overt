@@ -635,15 +635,16 @@ const brewCask: IPCBrewCask = {
       });
 
       terminal.send(
-        quote([
-          await getBrewExecutablePath(),
-          "install",
-          ...(await getVerboseFlags()),
-          force ? "--force" : "--adopt",
-          ...(await getQuarantineFlags()),
-          "--cask",
-          caskName,
-        ]) +
+        noAskEnvPrefix +
+          quote([
+            await getBrewExecutablePath(),
+            "install",
+            ...(await getVerboseFlags()),
+            force ? "--force" : "--adopt",
+            ...(await getQuarantineFlags()),
+            "--cask",
+            caskName,
+          ]) +
           " && echo '-- overt-succeeded: cask-install --' || echo '-- overt-failed: cask-install --'\n"
       );
     };
@@ -707,14 +708,15 @@ const brewCask: IPCBrewCask = {
       });
 
       terminal.send(
-        quote([
-          await getBrewExecutablePath(),
-          "upgrade",
-          ...(await getVerboseFlags()),
-          ...(await getQuarantineFlags()),
-          "--cask",
-          caskName,
-        ]) +
+        noAskEnvPrefix +
+          quote([
+            await getBrewExecutablePath(),
+            "upgrade",
+            ...(await getVerboseFlags()),
+            ...(await getQuarantineFlags()),
+            "--cask",
+            caskName,
+          ]) +
           " && echo '-- overt-succeeded: cask-upgrade --' || echo '-- overt-failed: cask-upgrade --'\n"
       );
     });
@@ -923,5 +925,11 @@ export async function getQuarantineFlags(): Promise<string[]> {
 export async function getVerboseFlags(): Promise<string[]> {
   return (await settings.get("verboseLogging")) ? ["-v"] : [];
 }
+
+// Homebrew 5+ asks "Do you want to proceed? [y/n]" before installs/upgrades.
+// Overt can't relay that prompt to the UI, and the user already confirmed by
+// starting the task, so suppress it via the environment (older Homebrew
+// versions ignore the variable).
+export const noAskEnvPrefix = "HOMEBREW_NO_ASK=1 ";
 
 export default brewCask;
